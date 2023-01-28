@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use crate::pixel::Pixel;
 use crate::{HUFF_CODE_TAG, RAW_PIXEL_BYTES_SIZE};
+use crate::bitwise_buffer::EncodedBit;
 
 
 #[derive(Clone, Copy)]
@@ -29,7 +30,7 @@ pub enum NodeTypes {
 /// where items to the left have an index + 0 and to the right + 1
 /// allowing a branch to be called by a single string of bits
 
-pub fn build_huffman_tree(pixels: &Vec<Pixel>) -> HashMap<Pixel, u32> {
+pub fn build_huffman_tree(pixels: &Vec<Pixel>) -> (HashMap<Pixel, Vec<EncodedBit>>, Vec<(&Pixel, &u32)>) {
     let mut freq_map: HashMap<Pixel, u32> = HashMap::new();
 
     // Count the frequency of each pixel
@@ -78,25 +79,49 @@ pub fn build_huffman_tree(pixels: &Vec<Pixel>) -> HashMap<Pixel, u32> {
             sorted_pixels.remove(0);
         }
     }
-    let mut code_map: HashMap<Pixel, u32> = HashMap::new();
-    set_code(&mut code_map, &mut curr_switch.left, 0);
-    set_code(&mut code_map, &mut curr_switch.right, 1);
+    let mut code_map: HashMap<Pixel, Vec<EncodedBit>> = HashMap::new();
+    set_code(&mut code_map, &mut curr_switch.left, 0, 1);
+    set_code(&mut code_map, &mut curr_switch.right, 1, 1);
 
-    code_map
+    (code_map, sorted_pixels)
 }
 
-fn set_code(map: &mut HashMap<Pixel, u32>, t: &mut NodeTypes, c: u32) {
-    if c < (RAW_PIXEL_BYTES_SIZE) { // -1 for the huffman tag size
+fn set_code(map: &mut HashMap<Pixel, Vec<EncodedBit>>, t: &mut NodeTypes, c: u32, len: usize) {
+    if c < ( RAW_PIXEL_BYTES_SIZE - 1 ) { // -1 for the huffman tag size
         match t {
             NodeTypes::Node(node) => {
-                map.entry(node.pixel).or_insert(c);
+                map.entry(node.pixel).or_insert(u32_to_encoded_bit(c, len));
                 //node.code = c;
             },
             NodeTypes::Switch(switch) => {
                 let a = c.clone(); //FIXME
-                set_code(map, &mut switch.left, c * 2);
-                set_code(map, &mut switch.right, a * 2 + 1);
+                set_code(map, &mut switch.left, c * 2, len + 1);
+                set_code(map, &mut switch.right, a * 2 + 1, len + 1);
             },
         }
+    }
+}
+
+fn u32_to_encoded_bit(c: u32, len: usize) -> Vec<EncodedBit> {
+    if len >= 8 {
+        vec![EncodedBit { data: c as u8, bit_len: len }]
+    } else if len >= 16 {
+        let n = len - 8;
+        vec![EncodedBit { data: (c >> n) as u8, bit_len: 8 }, EncodedBit { data: ((c << (8-n)) as u8) >> (8-n), bit_len: len - 8 }]
+    } else if n >= 24 {
+        let n = len - 8;
+        vec![
+            EncodedBit { data: (c >> n) as u8, bit_len: 8 },
+            EncodedBit { data: (c >> (n-8)) as u8, bit_len: 8 },
+            EncodedBit { data: ((c << (16-n)) as u8) >> (16-n), bit_len: len - 16 },
+        ]
+    } else {
+        let n = len - 8;
+        vec![
+            EncodedBit { data: (c >> n) as u8, bit_len: 8 },
+            EncodedBit { data: (c >> (n-8)) as u8, bit_len: 8 },
+            EncodedBit { data: (c >> (n-16)) as u8, bit_len: 8 },
+            EncodedBit { data: ((c << (24-n)) as u8) >> (24-n), bit_len: len - 24 },
+        ]
     }
 }

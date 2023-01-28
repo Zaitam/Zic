@@ -1,51 +1,36 @@
-struct BitwiseBuffer {
+pub(crate) struct BitwiseBuffer {
     buffer: Vec<u8>,
     remaining_bits: usize,
     current_byte: u8,
 }
 
-struct EncodedBit {
-    data: u8, //TODO: Make this work for u8, u16, u32, u64
-    bit_len: usize,
+pub(crate) struct EncodedBit {
+    pub data: u8, //TODO: Make this work for u8, u16, u32, u64
+    pub bit_len: usize,
 }
-/*enum Unsigned {
-    U16(u16),
-    U32(u32),
-    U64(u64),
-}*/
 
 impl BitwiseBuffer {
-    fn new() -> BitwiseBuffer {
+    pub fn new() -> BitwiseBuffer {
         BitwiseBuffer {
             buffer: vec![],
-            remaining_bits: 4,
+            remaining_bits: 8,
             current_byte: 0,
         }
     }
 
-    fn push_bits<T: Into<Unsigned>>(&mut self, bits: Vec<EncodedBit>) {
+    pub fn push_bits(&mut self, bits: &Vec<EncodedBit>) {
         for encoded_bit in bits {
-            if encoded_bit.bit_len <= self.remaining_bits { //If the data enters in remaining bits
+            if encoded_bit.bit_len <= self.remaining_bits {
                 self.push_to_curr_bit(encoded_bit.data, encoded_bit.bit_len);
                 if self.remaining_bits == 0 {
                     self.push_bit();
                 }
-            } else {
-                // usize division does a floor func automatically so no need to floor or ciel, just add 7
-                let iterations = (encoded_bit.bit_len - self.remaining_bits + 7)/8;
-                // first iter
-                let n = encoded_bit.bit_len - self.remaining_bits;
-                self.push_to_curr_bit(encoded_bit.data >> (8 - self.remaining_bits), self.remaining_bits);
-                self.push_bit();
-                // Doesn't include first and last iterations
-                for i in 1..iterations {
-                    self.push_to_curr_bit( (encoded_bit.data >> n - (i * 8)) as u8, 8);
-                    self.push_bit();
-                }
-                // last iter
-                let len = n - ((iterations - 1) * 8);
-                self.push_to_curr_bit((((encoded_bit.data << (8 - len)) as u8) >> (8 - len)) ,len);
+                continue;
             }
+            let n = encoded_bit.bit_len - self.remaining_bits;
+            self.push_to_curr_bit(encoded_bit.data >> (n), self.remaining_bits);
+            self.push_bit();
+            self.push_to_curr_bit(((encoded_bit.data << (8 - n)) as u8) >> (8 - n) ,n);
         }
     }
 
