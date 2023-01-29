@@ -1,10 +1,10 @@
-pub(crate) struct BitwiseBuffer {
+pub struct BitwiseBuffer {
     buffer: Vec<u8>,
     remaining_bits: usize,
     current_byte: u8,
 }
 
-pub(crate) struct EncodedBit {
+pub struct EncodedBit {
     pub data: u8, //TODO: Make this work for u8, u16, u32, u64
     pub bit_len: usize,
 }

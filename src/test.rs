@@ -3,6 +3,7 @@ mod tests {
     use std::fmt::format;
     use std::ops::Add;
     use crate::{encode, ImageDesc};
+    //use crate::format_translation::open_png;
     use crate::huffman::{build_huffman_tree, NodeTypes};
     use crate::pixel::Pixel;
     use super::*;

@@ -30,7 +30,7 @@ pub enum NodeTypes {
 /// where items to the left have an index + 0 and to the right + 1
 /// allowing a branch to be called by a single string of bits
 
-pub fn build_huffman_tree(pixels: &Vec<Pixel>) -> (HashMap<Pixel, Vec<EncodedBit>>, Vec<(&Pixel, &u32)>) {
+pub fn build_huffman_tree(pixels: &Vec<Pixel>) -> (HashMap<Pixel, Vec<EncodedBit>>, Vec<(Pixel, u32)>) {
     let mut freq_map: HashMap<Pixel, u32> = HashMap::new();
 
     // Count the frequency of each pixel
@@ -39,21 +39,21 @@ pub fn build_huffman_tree(pixels: &Vec<Pixel>) -> (HashMap<Pixel, Vec<EncodedBit
     }
 
     // Sort the pixels
-    let mut sorted_pixels: Vec<(&Pixel, &u32)> = freq_map.iter().collect();
-    sorted_pixels.sort_by_key(|&(_, &frequency)| frequency);
+    let mut sorted_pixels: Vec<(Pixel, u32)> = freq_map.iter().map(|(a,b)| (*a, *b)).collect();
+    sorted_pixels.sort_by_key(|&(_, f)| f);
 
     // Set the base node
     let mut curr_switch = Switch {
         freq: sorted_pixels[0].1 + sorted_pixels[0].1,
         left: NodeTypes::Node(Node {
             //code: 0,
-            freq: *sorted_pixels[1].1,
-            pixel: *sorted_pixels[1].0,
+            freq: sorted_pixels[1].1,
+            pixel: sorted_pixels[1].0,
         }),
         right: NodeTypes::Node(Node {
             //code: 0,
-            freq: *sorted_pixels[0].1,
-            pixel: *sorted_pixels[0].0,
+            freq: sorted_pixels[0].1,
+            pixel: sorted_pixels[0].0,
         }),
     };
     sorted_pixels.drain(..2);
@@ -63,7 +63,7 @@ pub fn build_huffman_tree(pixels: &Vec<Pixel>) -> (HashMap<Pixel, Vec<EncodedBit
         // So if the second item of sorted_pixels is smaller than the curr_switch item,
         // a new switch will be generated containing all the items smaller than curr_switch
         // then both will be joined, else, the first item of sorted_pixels will be added to a new switch
-        if (sorted_pixels.len() > 1) && (curr_switch.freq > *sorted_pixels[1].1) {
+        if (sorted_pixels.len() > 1) && (curr_switch.freq > sorted_pixels[1].1) {
             println!("Yeah, so just finish it");
         } else {
             // So we make a new node into the tree containing the sum of the freq and we remove the first item
@@ -71,8 +71,8 @@ pub fn build_huffman_tree(pixels: &Vec<Pixel>) -> (HashMap<Pixel, Vec<EncodedBit
                 freq: curr_switch.freq + sorted_pixels[0].1,
                 left: NodeTypes::Node(Node {
                     //code: 0,
-                    freq: *sorted_pixels[0].1,
-                    pixel: *sorted_pixels[0].0,
+                    freq: sorted_pixels[0].1,
+                    pixel: sorted_pixels[0].0,
                 }),
                 right: NodeTypes::Switch(Box::new(curr_switch)),
             };
@@ -104,13 +104,14 @@ fn set_code(map: &mut HashMap<Pixel, Vec<EncodedBit>>, t: &mut NodeTypes, c: u32
 
 fn u32_to_encoded_bit(c: u32, len: usize) -> Vec<EncodedBit> {
     if len >= 8 {
-        vec![EncodedBit { data: c as u8, bit_len: len }]
+        vec![EncodedBit { data: HUFF_CODE_TAG, bit_len: 1 }, EncodedBit { data: c as u8, bit_len: len }]
     } else if len >= 16 {
         let n = len - 8;
-        vec![EncodedBit { data: (c >> n) as u8, bit_len: 8 }, EncodedBit { data: ((c << (8-n)) as u8) >> (8-n), bit_len: len - 8 }]
-    } else if n >= 24 {
+        vec![EncodedBit { data: HUFF_CODE_TAG, bit_len: 1 }, EncodedBit { data: (c >> n) as u8, bit_len: 8 }, EncodedBit { data: ((c << (8-n)) as u8) >> (8-n), bit_len: len - 8 }]
+    } else if len >= 24 {
         let n = len - 8;
         vec![
+            EncodedBit { data: HUFF_CODE_TAG, bit_len: 1 },
             EncodedBit { data: (c >> n) as u8, bit_len: 8 },
             EncodedBit { data: (c >> (n-8)) as u8, bit_len: 8 },
             EncodedBit { data: ((c << (16-n)) as u8) >> (16-n), bit_len: len - 16 },
@@ -118,6 +119,7 @@ fn u32_to_encoded_bit(c: u32, len: usize) -> Vec<EncodedBit> {
     } else {
         let n = len - 8;
         vec![
+            EncodedBit { data: HUFF_CODE_TAG, bit_len: 1 },
             EncodedBit { data: (c >> n) as u8, bit_len: 8 },
             EncodedBit { data: (c >> (n-8)) as u8, bit_len: 8 },
             EncodedBit { data: (c >> (n-16)) as u8, bit_len: 8 },
